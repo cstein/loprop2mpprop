@@ -1,0 +1,164 @@
+#!/usr/bin/env python
+
+"""
+Program to convert DALTON LoProp results into the MpProp file format
+""" 
+__author__ = "Morten Steen Noerby, Casper Steinmann"
+__copyright__ = "2015"
+__credits__ = ["Morten Steen Noerby", "Casper Steinmann"]
+
+__maintainer__ = "Casper Steinmann"
+__email__ = "css@sdu.dk"
+__status__ = "development"
+
+import os
+import sys
+import argparse as ap
+import numpy as np
+
+
+def make_mpprop(args):
+
+    fin  = open(args.lopropfile, 'r')
+    k = 0
+    for line in fin:
+        if 'Atomic domain' in line:
+            k += 1
+    fin.close()
+    
+    natoms = k
+    if args.outfile is None:
+        outfile = '{0}.MpProp'.format(os.path.basename(args.lopropfile))
+    else:
+        outfile = args.outfile
+    fout = open(outfile, 'w')
+
+    fout.write('**************************************************\n')
+    fout.write('*Molecule\n')
+    fout.write('\n')
+    fout.write('*Method\n')
+    fout.write('KS-DFT\n')
+    fout.write('* Level of Multipoles and Polarizabilities\n')
+#    bla = '    {0}    {1}\n'.format(args.max_l,1)
+    bla = '    2    1'
+    fout.write(bla+'\n')
+    fout.write('* All centers\n')
+    centers = '    {0}\n'.format(natoms)
+    fout.write(centers)
+
+    fin  = open(args.lopropfile, 'r')
+
+    write_atom = False
+    write_mol  = False
+    fmt = "%20.10f"
+    zero = 0.0
+    nulls = [0.00000,0.00000,0.00000]
+    for line in fin:
+        if 'Atomic domain' in line:
+           # bla = '    {0}    {1}\n'.format(args.max_l,1)
+            bla = '    2    1    '
+            fout.write(bla+'\n')
+            m0 = 0.0
+            m1 = []
+            m2 = []
+            isopol = 0.0
+            fullpol = []
+            center = []
+            write_atom = True
+        if 'Molecular' in line:
+            mol = '* Molecule properties\n'
+            fout.write(mol)
+            m0 = 0.0
+            m1 = []
+            m2 = []
+            isopol = 0.0
+            fullpol = []
+            center = []
+            write_atom = False
+            write_mol = True
+        if write_atom:
+            if 'Domain center' in line:
+                line = line.split()
+                [center.append(float(coord)) for coord in line[-3:]] 
+                lout = (3*fmt) % tuple(center[:])
+                fout.write(lout+'\n') 
+            if 'Total charge' in line:
+                line = line.split()
+                m0 = line[-1]
+                lout = (1*fmt) % float(m0)
+                fout.write(lout+'\n') 
+            if 'Electronic dipole' in line and "norm" not in line:
+                line = line.split()
+                print line
+                [m1.append(float(dip)) for dip in line[-3:]] 
+                lout = (3*fmt) % tuple(m1[:])
+                fout.write(lout+'\n') 
+            if 'Electronic quadrupole' in line:
+                line = line.split()
+                [m2.append(float(qua)) for qua in line[-6:]] 
+                lout = (3*fmt) % tuple(m2[:3])
+                fout.write(lout+'\n') 
+                lout = (3*fmt) % tuple(m2[3:])
+                fout.write(lout+'\n') 
+                lout = (1*fmt) % float(zero)
+                fout.write(lout+'\n') 
+                lout = (3*fmt) % tuple(nulls[:])
+                fout.write(lout+'\n') 
+                lout = (3*fmt) % tuple(nulls[:])
+                fout.write(lout+'\n') 
+                lout = (3*fmt) % tuple(nulls[:])
+                fout.write(lout+'\n') 
+            if 'Electronic polarizability' in line:
+                line = line.split()
+                [fullpol.append(float(pol)) for pol in line[-6:]]
+                lout = (1*fmt) % fullpol[0]
+                lout1 = (1*fmt) % fullpol[1]
+                lout2 = (1*fmt) % fullpol[3]
+                fout.write(lout+lout1+lout2+'\n') 
+                lout = (1*fmt) % fullpol[2]
+                lout1 = (1*fmt) % fullpol[4]
+                lout2 = (1*fmt) % fullpol[5]
+                fout.write(lout+lout1+lout2+'\n') 
+        if write_mol:
+            if 'Total charge' in line:
+                line = line.split()
+                m0 = line[-1]
+                lout = (1*fmt) % float(m0)
+                fout.write(lout+'\n') 
+            if 'Total   dipole' in line:
+                line = line.split()
+                [m1.append(float(dip)) for dip in line[-3:]] 
+                lout = (3*fmt) % tuple(m1[:])
+                fout.write(lout+'\n') 
+            if 'Total      quadrupole' in line:
+                line = line.split()
+                [m2.append(float(qua)) for qua in line[-6:]] 
+                lout = (3*fmt) % tuple(m2[:3])
+                fout.write(lout+'\n') 
+                lout = (3*fmt) % tuple(m2[3:])
+                fout.write(lout+'\n') 
+            if 'Polarizability' in line: 
+                line = fin.next()
+                line = line.split()
+                [fullpol.append(float(pol)) for pol in line[-6:]]
+                lout = (1*fmt) % fullpol[0]
+                lout1 = (1*fmt) % fullpol[1]
+                lout2 = (1*fmt) % fullpol[3]
+                fout.write(lout+lout1+lout2+'\n') 
+                lout = (1*fmt) % fullpol[2]
+                lout1 = (1*fmt) % fullpol[4]
+                lout2 = (1*fmt) % fullpol[5]
+                fout.write(lout+lout1+lout2+'\n') 
+    fout.close()
+    fin.close()
+    return
+
+if __name__ == '__main__':
+    parser = ap.ArgumentParser()
+    parser.add_argument('lopropfile', metavar='file',
+                        help='''Output from loprop calculation to be converted.''')
+    parser.add_argument('-o', metavar='filename', dest='outfile',
+                        help='''output filename.''')
+
+    args = parser.parse_args()
+    make_mpprop(args)
